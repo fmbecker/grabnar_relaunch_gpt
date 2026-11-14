@@ -99,6 +99,14 @@ jobs:
         working-directory: web
         # Performance on shared runners is noisy: gate at 80 there, 90 locally.
         run: node scripts/audit.mjs --base http://127.0.0.1:8080 --min-perf 80 --json audit-report.json
+      - name: Capture responsive screenshots
+        if: always()
+        working-directory: web
+        run: node scripts/screenshots.mjs --base http://127.0.0.1:8080 --out screenshots
+      - name: Upload responsive screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with: { name: responsive-screenshots, path: web/screenshots/*.png, if-no-files-found: ignore }
       - name: Upload audit report
         if: always()
         uses: actions/upload-artifact@v4
