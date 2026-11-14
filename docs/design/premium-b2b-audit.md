@@ -58,3 +58,28 @@ Die CI erzeugt über `web/scripts/screenshots.mjs` Screenshots bei 390 und 1440 
 | Kontakt 390/1440 px | unverändert | unverändert | pixelidentisch |
 
 **Ergebnis:** Die mobile Verdichtung wirkt auf die gewünschte Seite und reduziert die Scrolllänge deutlich. Diese Messung ersetzt keine manuelle Qualitätsabnahme von Typografie, Fotografie und visueller Hierarchie. Beide CI-Läufe sind erfolgreich; die Screenshots sind als GitHub-Actions-Artefakt `responsive-screenshots` verfügbar.
+
+## Bildkonzept für die nächste Iteration
+
+**Ziel:** Der visuelle Schwerpunkt soll auf der konkreten Arbeit und Materialqualität liegen, nicht auf abstrakten Gebäudesilhouetten. Die aktuellen `BrandPattern`-Flächen bleiben ein technisch robuster Fallback, bis freigegebenes Bildmaterial vorliegt.
+
+| Einsatz | Motivrichtung | Bildausschnitt | Anforderungen |
+| --- | --- | --- | --- |
+| Startseiten-Hero | Moderne Gewerbeimmobilie mit nachvollziehbarer Dienstleistungssituation | Weit, klare Architektur, freie Fläche für das Layout | Keine sichtbaren Marken, keine erfundenen Grabnar-Teams; Foto muss auf 390 und 1440 px funktionieren |
+| Gebäudereinigung | Fachgerechte Unterhalts- oder Glasreinigung in Büro-/Gewerbeobjekten | Handlungsnah, Werkzeuge und Oberflächen sichtbar | Schutzkleidung und Arbeitsabläufe plausibel, keine erkennbaren Personen ohne Freigabe |
+| Gebäudedienste | Technischer Gebäudebetrieb und Objektpflege | Räumliche Tiefe, sachliche Details | Nicht als Sicherheitsdienst nach §34a darstellen |
+| Handwerk | Präzise Ausführung von Fliesen-, Maler- oder anderen belegten Gewerken | Detail und Materialtextur | Keine unrealistischen Werkzeuge oder fehlerhaften Bauteilanschlüsse |
+| Weitere Leistungen | Je nach tatsächlich dokumentiertem Leistungsumfang | Einheitlicher fotografischer Stil | Keine zusätzlichen Leistungsversprechen erfinden |
+
+### Bildregeln
+
+1. Natürliches Tageslicht, kühle neutrale Blau-Grau-Palette, realistische Materialien und Perspektiven.
+2. Echte freigegebene Firmenfotografie bevorzugen. Generierte Bilder nur als **Illustrations- bzw. Konzeptmotive** kennzeichnen und vor einer produktiven Verwendung gesondert freigeben.
+3. Keine Schrift, Wasserzeichen, Logos, erkennbaren Gesichter oder fremden Marken im Motiv.
+4. Für Hero und ServiceGrid passende Bildausschnitte in Wagtail hinterlegen und über vorhandene Renditions ausgeben; Fokuspunkt für Mobilansichten kontrollieren.
+5. Alt-Texte beschreiben den tatsächlich sichtbaren Inhalt, nicht die gewünschte Werbebotschaft. Dekorative Platzhalter bleiben `aria-hidden`.
+6. Keine externen Bild-CDNs oder Stock-URLs direkt im Frontend einbinden.
+
+### Freigabekriterium
+
+Vor dem Austausch der Platzhalter müssen Herkunft, Nutzungsrechte, Aussagekraft und CMS-Integration jedes Bildes geprüft sein. Bis dahin ist die bestehende Illustration eine bewusste, transparente Zwischenlösung.
