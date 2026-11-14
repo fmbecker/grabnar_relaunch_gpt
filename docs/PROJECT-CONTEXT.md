@@ -8,7 +8,9 @@
 - **Quellrepository:** `fmbecker/grabnar_relaunch`. Ausschließlich lesen. Dort niemals Dateien ändern, Commits erstellen, Branches anlegen oder PRs verändern.
 - Geprüfter Quellstand: Branch `main`, Commit `96c9acc66b29f43ac3ecec6f4cb059551881b02c` (Merge-Commit vom 01.11.2026).
 - Beim Review enthielt die Quelle 288 Dateien, darunter 36 Binärdateien.
-- Der Workspace war zu Beginn dieses Transfers praktisch leer. Es wurde **kein Anwendungscode** übernommen. Diese Dokumentation ist eine kuratierte Übertragung der Projektentscheidungen und des Arbeitskontexts.
+- Der Workspace war zu Beginn dieses Transfers praktisch leer. **Aktualisierung 14.11.2026:** Der vollständige ursprüngliche Projektstand einschließlich Anwendungscode, Assets und Git-Historie wurde über Integrationsbranch `integrate/source-main-2026-11-13` und Pull Request #1 in den Workspace übernommen. Die ursprüngliche README liegt zusätzlich unter `docs/SOURCE-README.md`; die Workspace-README und `AGENTS.md` blieben erhalten.
+- Import-Merge auf `main`: `0012391699596ddb3c26b9b524a305c75aa44947` (14.11.2026). CMS- und Web-Workflows auf `main` waren erfolgreich; das CMS-Container-Image konnte nach Korrektur der GHCR-Paketberechtigung veröffentlicht werden.
+- Aktiver Redesign-Arbeitsbranch: `feat/premium-b2b-redesign`, aus diesem `main`-Stand erstellt. `main` bleibt bis zur geprüften Freigabe unangetastet.
 - Vor Änderungen am Workspace zuerst dessen aktuellen Branch, Dateibaum und letzte Commits prüfen. Quelländerungen nach dem oben genannten SHA separat vergleichen und nur nach bewusster Entscheidung übernehmen.
 
 ## 2. Produkt und Zielgruppen
@@ -150,7 +152,7 @@ Vor Go-live / vor realem Betrieb zu klären:
 - Karte: selbst gehostetes Leaflet/OSM war noch offen; bisher Adresse plus OSM-Link.
 - Umami v3 aktualisieren/konfigurieren; Website-ID, API-Key, Reports und Monatsberichtsempfänger festlegen.
 - SMTP-Zugang für Formulare einrichten.
-- Deployment: GHCR-Paketzugriff, Docker/Node/pnpm, Staging, Preview-Dienst, Backup/Offsite-Restore, Nginx-Umschaltung und TLS prüfen.
+- Deployment: **GHCR-Paketzugriff für den Workspace ist eingerichtet; CMS-Image-Push auf `main` erfolgreich (14.11.2026).** Weiterhin offen: Docker/Node/pnpm auf dem Zielserver, Staging, Preview-Dienst, Backup/Offsite-Restore, Nginx-Umschaltung und TLS prüfen.
 - Search Console und Sitemap nach Go-live prüfen.
 - Altserver erst nach Sicherung von Mediathek und MySQL-Dump und nach angemessener Übergangszeit abschalten.
 
@@ -170,8 +172,14 @@ Für die weitere Arbeit in der Reihenfolge:
 9. `docs/design/brief-rework.md` – ursprüngliches Rework-Briefing; ältere offene Optionen sind durch spätere Entscheidungen in `docs/06-design.md` überholt.
 10. `docs/content-neu/`, `docs/content-export/`, `docs/content-overrides.csv`, `docs/redirects.csv` – redaktionelle Inhalte, Freigaben und Migration.
 
-## 10. Nächster sinnvoller Schritt
+## 10. Nächster sinnvoller Schritt – Premium-B2B-Redesign (Stand 14.11.2026)
 
-1. Quell- und Workspace-Branchstände erneut prüfen.
-2. Den vollständigen Quellcode inklusive Assets und Historie kontrolliert in einen eigenen Workspace-Branch übernehmen oder – falls der Workspace absichtlich unabhängig bleiben soll – einen klar dokumentierten Snapshot importieren.
-3. Erst nach dem Import den Codezustand, Branches und offene Änderungen prüfen; nicht auf Basis dieser Dokumentation allein Codeänderungen vornehmen.
+**Integrationsphase abgeschlossen.** Die früher hier aufgeführten Import-Schritte sind erledigt. Für die weitere Umsetzung gilt:
+
+1. **Baseline sichern:** Vorhandene Startseite und zentrale Seitentypen bei 1440 px und 390 px gegen `docs/design/nachher/` prüfen. CI-Stand auf `main` ist grün; das ist kein Ersatz für eine visuelle Abnahme.
+2. **Designsystem prüfen und gezielt verfeinern:** `web/src/styles/global.css`, `Header.astro`, `blocks/Hero.astro`, `blocks/ServiceGrid.astro` und gemeinsame UI-Komponenten. Markenfarben, Logo, Manrope 800 und Arial sowie `docs/06-design.md` als verbindliche Grundlage beibehalten.
+3. **Startseite als Referenz:** Bildkomposition, Weißraum, Typohierarchie, Leistungsdarstellung, Qualitätsnachweise und Kontakt-CTAs für gewerbliche Entscheider ausarbeiten. Keine unbelegten Aussagen oder neuen Firmenkennzahlen.
+4. **Weitere Seitentypen konsistent überarbeiten:** Kategorie, Leistung, Unternehmen, Karriere und Kontakt. Wagtail-Block-Vertrag und Umami-Tracking unverändert funktionsfähig halten.
+5. **Qualität und Review:** `pnpm lint`, `pnpm check`, `pnpm check:tracking`, Build gegen Seed-CMS, Lighthouse/axe, Mobile- und Desktop-Screenshots; Änderungen erst nach grünen Prüfungen per PR nach `main` bringen.
+
+**Abgrenzung:** Kein Go-live, kein Server- oder DNS-Eingriff, keine Änderungen am read-only-Quellrepository. Echte Firmenfotos und rechtliche Freigaben bleiben gesonderte Abhängigkeiten.

@@ -21,25 +21,25 @@ const pad = (n: number) => String(n + 1).padStart(2, "0");
         {value.intro && <p class="lead mt-4 text-ink-700">{value.intro}</p>}
       </div>
 
-      <ul class="mt-12 space-y-16 lg:mt-16 lg:space-y-24">
+      <ul class="mt-9 space-y-14 sm:mt-12 sm:space-y-20 lg:mt-16 lg:space-y-28">
         {value.services.map((c, i) => {
           const flip = i % 2 === 1;
           const overview = umami(EVENT.category, { category: c.title, target: "overview" });
           return (
-            <li class="grid items-center gap-8 lg:grid-cols-12 lg:gap-12">
+            <li class="grid items-center gap-5 sm:gap-8 lg:grid-cols-12 lg:gap-12 xl:gap-16">
               <a href={c.href} tabindex="-1" aria-hidden="true" {...overview}
-                class:list={["block overflow-hidden bg-brand-50 lg:col-span-6", flip && "lg:order-2 lg:col-start-7"]}>
+                class:list={["group block overflow-hidden bg-brand-50 lg:col-span-6", flip && "lg:order-2 lg:col-start-7"]}>
                 {c.image
-                  ? <Picture image={c.image} variant="wide" sizes="(min-width: 1024px) 50vw, 100vw" class="aspect-[4/3] w-full object-cover transition-transform duration-500 hover:scale-[1.02] motion-reduce:transition-none motion-reduce:hover:scale-100" />
-                  : <BrandPattern tone="light" seed={i} class="aspect-[4/3] w-full" />}
+                  ? <Picture image={c.image} variant="wide" sizes="(min-width: 1024px) 50vw, 100vw" class="aspect-[16/10] w-full object-cover sm:aspect-[4/3] transition-transform duration-500 group-hover:scale-[1.025] motion-reduce:transition-none motion-reduce:group-hover:scale-100" />
+                  : <BrandPattern tone="light" seed={i} class="aspect-[16/10] w-full sm:aspect-[4/3]" />}
               </a>
               <div class:list={["lg:col-span-6", flip && "lg:order-1 lg:col-start-1 lg:row-start-1"]}>
-                <p class="font-display text-lg font-extrabold text-accent-600" aria-hidden="true">{pad(i)}</p>
-                <h3 class="h2 mt-2">
+                <p class="font-display text-sm font-extrabold tracking-[0.16em] text-accent-600" aria-hidden="true">{pad(i)}</p>
+                <h3 class="h2 mt-2 sm:mt-4">
                   <a href={c.href} class="hover:text-brand-700 hover:underline decoration-2 underline-offset-4" {...overview}>{c.title}</a>
                 </h3>
                 {c.children && c.children.length > 0 ? (
-                  <ul class="mt-6 grid border-t border-ink-100 sm:grid-cols-2 sm:gap-x-8">
+                  <ul class="mt-5 grid border-t border-ink-100 sm:mt-7 sm:grid-cols-2 sm:gap-x-8">
                     {c.children.map((s) => (
                       <li class="border-b border-ink-100">
                         <a href={s.href} class="group flex min-h-11 items-center justify-between gap-3 py-2.5 text-ink-900 hover:text-brand-700" {...umami(EVENT.category, { category: c.title, target: "service", service: s.title })}>
@@ -52,7 +52,7 @@ const pad = (n: number) => String(n + 1).padStart(2, "0");
                 ) : (
                   c.teaser && <p class="mt-4 text-ink-700">{c.teaser}</p>
                 )}
-                <a href={c.href} class="btn-secondary mt-8" {...overview}>Zu {c.title} <Icon name="arrow" class="h-4 w-4" /></a>
+                <a href={c.href} class="btn-secondary mt-6 sm:mt-8" {...overview}>Zu {c.title} <Icon name="arrow" class="h-4 w-4" /></a>
               </div>
             </li>
           );
@@ -68,17 +68,17 @@ const pad = (n: number) => String(n + 1).padStart(2, "0");
       <ul class="mt-10 grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
         {value.services.map((s, i) => (
           <li>
-            <a href={s.href} {...umami(EVENT.service, { service: s.title, list })} class="group flex h-full flex-col border border-ink-100 bg-white transition-colors hover:border-brand-500 motion-reduce:transition-none">
+            <a href={s.href} {...umami(EVENT.service, { service: s.title, list })} class="group flex h-full flex-col border border-ink-100 bg-white transition-colors hover:border-brand-500 focus-visible:outline-3 focus-visible:outline-offset-2 focus-visible:outline-brand-500 motion-reduce:transition-none">
               <div class="relative overflow-hidden bg-brand-50">
                 {s.image
-                  ? <Picture image={s.image} variant="card" sizes="(min-width: 1024px) 33vw, (min-width: 640px) 50vw, 100vw" class="aspect-[3/2] w-full object-cover" />
+                  ? <Picture image={s.image} variant="card" sizes="(min-width: 1024px) 33vw, (min-width: 640px) 50vw, 100vw" class="aspect-[3/2] w-full object-cover transition-transform duration-500 group-hover:scale-[1.025] motion-reduce:transition-none motion-reduce:group-hover:scale-100" />
                   : <BrandPattern tone="light" seed={i} class="aspect-[3/2] w-full" />}
-                <span class="absolute bottom-0 left-0 bg-brand-500 p-2.5 text-white"><Icon name={s.icon} class="h-5 w-5" /></span>
+                <span class="absolute bottom-0 left-0 bg-accent-600 p-3 text-white"><Icon name={s.icon} class="h-5 w-5" /></span>
               </div>
-              <div class="flex flex-1 flex-col border-t-4 border-transparent p-6 group-hover:border-brand-500">
-                <h3 class="h4 uppercase group-hover:text-brand-700">{s.title}</h3>
+              <div class="flex flex-1 flex-col border-t-2 border-brand-500 p-5 sm:p-6">
+                <h3 class="h4 font-display font-extrabold uppercase group-hover:text-brand-700">{s.title}</h3>
                 {s.teaser && <p class="mt-3 text-ink-700">{s.teaser}</p>}
-                <span class="mt-auto inline-flex items-center gap-2 pt-5 font-semibold text-brand-700">Mehr erfahren <Icon name="arrow" class="h-4 w-4 transition-transform group-hover:translate-x-0.5 motion-reduce:transition-none" /></span>
+                <span class="mt-auto inline-flex items-center gap-2 pt-6 font-semibold text-brand-700">Mehr erfahren <Icon name="arrow" class="h-4 w-4 transition-transform group-hover:translate-x-0.5 motion-reduce:transition-none" /></span>
               </div>
             </a>
           </li>
