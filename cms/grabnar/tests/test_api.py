@@ -1,0 +1,449 @@
+# ruff: noqa: E501
+"""Smoke tests against the seeded site (real legacy content + demo extras)."""
+
+import pytest
+from django.core.cache import cache
+from django.core.management import call_command
+
+pytestmark = pytest.mark.django_db
+
+
+@pytest.fixture(scope="module", autouse=True)
+def seeded(django_db_setup, django_db_blocker):
+    with django_db_blocker.unblock():
+        call_command("seed_dev", verbosity=0)
+        cache.clear()  # site-root-path cache was primed before seeding
+
+
+def test_navigation_has_categories_with_children(client):
+    nav = client.get("/api/v2/navigation/").json()
+    assert [i["href"] for i in nav["items"]] == [
+        "/gebaeudereinigung/",
+        "/gebaeudedienste/",
+        "/handwerkerdienste/",
+        "/services/",
+        "/unternehmen/",
+        "/karriere/",
+        "/kontakt/",
+    ]
+    assert [len(i["children"]) for i in nav["items"][:4]] == [9, 3, 6, 4]
+
+
+def test_home_shows_categories(client):
+    page = client.get("/api/v2/pages/", {"type": "home.HomePage", "fields": "*"}).json()["items"][0]
+    assert page["hero"][0]["value"]["motto"].startswith("Zusammenkommen")
+    assert page["hero"][0]["value"]["headline"].startswith("Reinigung")
+    assert page["body"][0]["type"] == "facts"
+    assert "22 Leistungen" in page["body"][0]["value"]["items"]  # {anzahl} = live service pages
+    ctas = [b["value"] for b in page["body"] if b["type"] == "cta"]
+    assert [c["style"] for c in ctas] == ["career", "contact"]
+    assert ctas[-1]["phone"]  # closing band shows the phone number from the settings
+    assert ctas[-1]["pattern"] is False  # tower pattern is opt-in per block
+    grid = next(b for b in page["body"] if b["type"] == "service_grid")["value"]
+    assert grid["kind"] == "categories" and len(grid["services"]) == 4
+    assert grid["services"][0]["children"][0]["href"].startswith("/gebaeudereinigung/")
+
+
+def test_service_page_content_and_list(client):
+    data = client.get(
+        "/api/v2/pages/", {"type": "services.ServicePage", "slug": "wachdienste", "fields": "*"}
+    ).json()
+    page = data["items"][0]
+    assert page["meta"]["html_url"].endswith("/services/wachdienste/")
+    assert "<li>Citystreifen</li>" in page["body"][0]["value"]
+    assert page["teaser"] and len(page["related"]) == 2
+    assert page["category"] == {"title": "Services", "href": "/services/"}
+
+
+def test_category_grid_lists_its_services(client):
+    data = client.get(
+        "/api/v2/pages/",
+        {"type": "services.ServiceIndexPage", "slug": "gebaeudedienste", "fields": "body"},
+    ).json()
+    grid = data["items"][0]["body"][0]["value"]
+    assert grid["kind"] == "services"
+    assert [s["title"] for s in grid["services"]] == [
+        "Grau- und Grünanlagenpflege",
+        "Hausmeisterdienste",
+        "Winterdienst",
+    ]
+
+
+def test_settings_and_redirects(client):
+    settings = client.get("/api/v2/settings/").json()
+    contact = settings["contact"]
+    assert settings["site"]["footer_pattern"] is False
+    assert contact["street"] == "Julius-Hölder-Straße 4" and contact["postal_code"] == "70597"
+    items = client.get("/api/v2/redirects/").json()["items"]
+    assert len(items) == 28
+    assert {
+        "from": "/Gebäudereinigung/Baureinigung",
+        "to": "/gebaeudereinigung/baureinigung/",
+        "status": 301,
+    } in items
+
+
+def test_karriere_embeds_job_portal(client):
+    data = client.get("/api/v2/pages/", {"type": "jobs.JobIndexPage", "fields": "body"}).json()
+    body = data["items"][0]["body"]
+    assert [b["type"] for b in body] == ["job_embed", "contact_form"]
+    embed = body[0]["value"]
+    assert embed["host"] == "grabnar.europersonal.com"
+    assert embed["url"].startswith("https://") and embed["height"] == 1700
+    assert body[1]["value"]["variant"] == "application"
+
+
+def test_job_embed_only_allowed_hosts():
+    from wagtail.blocks import StructBlockValidationError
+
+    from blocks.blocks import JobEmbedBlock
+
+    block = JobEmbedBlock()
+    ok = block.to_python({"url": "https://grabnar.europersonal.com/karriere/x", "height": 900})
+    assert block.clean(ok)["height"] == 900
+    for url in ("http://grabnar.europersonal.com/karriere/x", "https://example.com/jobs"):
+        with pytest.raises(StructBlockValidationError):
+            block.clean(block.to_python({"url": url, "height": 900}))
+
+
+def test_job_list_block_with_demo_jobs(client):
+
+    from blocks.blocks import JobListBlock
+    from jobs.models import JobPage
+
+    call_command("seed_dev", "--demo-jobs", verbosity=0)
+    jobs = JobListBlock().get_api_representation(JobListBlock().to_python({}))["jobs"]
+    assert len(jobs) == 3 and jobs[0]["employment_type_label"]
+    assert JobPage.objects.live().count() == 3
+
+
+def test_contact_form_spam_and_success(client):
+    base = {
+        "name": "A",
+        "email": "a@example.com",
+        "message": "Hi",
+        "consent": True,
+        "started_at": 1,
+    }
+    assert (
+        client.post("/api/forms/contact/", base, content_type="application/json").status_code == 201
+    )
+    bot = client.post(
+        "/api/forms/contact/", {**base, "website": "x"}, content_type="application/json"
+    )
+    assert bot.status_code == 201  # looks like success to the bot
+    bad = client.post(
+        "/api/forms/contact/", {**base, "consent": False}, content_type="application/json"
+    )
+    assert bad.status_code == 400 and "consent" in bad.json()["errors"]
+    from forms_api.models import ContactSubmission
+
+    assert ContactSubmission.objects.count() == 1
+
+
+def test_page_preview_returns_unsaved_draft(client):
+    from services.models import ServicePage
+
+    page = ServicePage.objects.get(slug="winterdienst")
+    page.title = "Winterdienst (Entwurf)"
+    page.teaser = "Geänderter Teaser nur in der Vorschau."
+    preview = page.create_page_preview()
+
+    res = client.get(
+        "/api/v2/page_preview/", {"content_type": "services.servicepage", "token": preview.token}
+    )
+    assert res.status_code == 200
+    data = res.json()
+    assert data["title"] == "Winterdienst (Entwurf)"
+    assert data["teaser"] == "Geänderter Teaser nur in der Vorschau."
+    assert data["meta"]["type"] == "services.ServicePage"
+    assert res["Cache-Control"] == "no-store"
+    # live page is untouched
+    assert ServicePage.objects.get(slug="winterdienst").title == "Winterdienst"
+
+
+def test_page_preview_rejects_bad_tokens(client):
+    bad = client.get(
+        "/api/v2/page_preview/", {"content_type": "services.servicepage", "token": "id=1:forged"}
+    )
+    assert bad.status_code == 404
+    wrong_type = client.get("/api/v2/page_preview/", {"content_type": "auth.user", "token": "x"})
+    assert wrong_type.status_code == 404
+
+
+def test_preview_settings_are_picked_up():
+    from wagtail_headless_preview.settings import headless_preview_settings
+
+    assert headless_preview_settings.CLIENT_URLS["default"].endswith("/preview/")
+
+
+def test_all_pages_pass_admin_validation():
+    """Every imported page must be saveable in the Wagtail admin (StreamField clean).
+
+    Regression: CTA links pointed at a not-yet-saved page and were stored as null,
+    which made the editor refuse to save or preview those pages.
+    """
+    from wagtail.fields import StreamField
+    from wagtail.models import Page
+
+    failures = []
+    for page in Page.objects.filter(depth__gt=1).specific():
+        for field in page._meta.get_fields():
+            if isinstance(field, StreamField):
+                value = getattr(page, field.name)
+                try:
+                    field.stream_block.clean(value)
+                except Exception as exc:  # noqa: BLE001
+                    failures.append(f"{page.url_path} {field.name}: {exc}")
+    assert not failures, "\n".join(failures)
+
+
+def test_service_teaser_not_repeated_in_body(client):
+    data = client.get(
+        "/api/v2/pages/", {"type": "services.ServicePage", "fields": "teaser,body", "limit": 50}
+    ).json()
+    assert len(data["items"]) == 22
+    for page in data["items"]:
+        body = page["body"][0]["value"] if page["body"] else ""
+        assert page["teaser"], page["title"]
+        assert page["teaser"] not in body, f"teaser repeated in body: {page['title']}"
+
+
+def test_spelling_fix_and_category_intro(client):
+    titles = [
+        p["title"]
+        for p in client.get("/api/v2/pages/", {"type": "services.ServicePage", "limit": 50}).json()[
+            "items"
+        ]
+    ]
+    assert "Desinfektion nach IfSG §17/3" in titles and not any("IFSG" in t for t in titles)
+    cat = client.get(
+        "/api/v2/pages/",
+        {"type": "services.ServiceIndexPage", "slug": "gebaeudedienste", "fields": "intro"},
+    ).json()["items"][0]
+    # Editorial intro from docs/content-overrides.csv replaces the generated one.
+    assert cat["intro"].startswith("Damit Ihr Objekt das ganze Jahr")
+
+
+def test_content_overrides_applied(client):
+    """Every row of docs/content-overrides.csv ends up on its page; SEO lengths stay sane."""
+    import csv
+    from pathlib import Path
+
+    from django.conf import settings
+    from wagtail.models import Page
+
+    path = Path(settings.BASE_DIR).parent / "docs" / "content-overrides.csv"
+    with path.open(encoding="utf-8-sig") as f:
+        rows = list(csv.DictReader(f, delimiter=";"))
+    assert len(rows) >= 30
+    by_url = {p.url: p.specific for p in Page.objects.live() if p.url}
+    for row in rows:
+        page = by_url[row["pfad"]]
+        assert page.seo_title == row["seo_titel"] and len(page.seo_title) <= 60, row["pfad"]
+        assert page.search_description == row["meta_beschreibung"], row["pfad"]
+        assert len(page.search_description) <= 160, row["pfad"]
+        if row["kurztext"]:
+            assert page.teaser == row["kurztext"], row["pfad"]
+
+
+def test_unternehmen_page(client):
+    page = client.get(
+        "/api/v2/pages/", {"type": "home.StandardPage", "slug": "unternehmen", "fields": "body"}
+    ).json()["items"][0]
+    types = [b["type"] for b in page["body"]]
+    assert types == ["rich_text", "feature_list", "certificate", "service_grid", "cta"]
+    assert "Meisterbetrieb" in [f["title"] for f in page["body"][1]["value"]["features"]]
+
+
+def test_rich_text_heading_order():
+    """Body rich text starts at <h2> and never skips a level (WCAG 1.3.1, axe heading-order)."""
+    import re
+
+    from wagtail.fields import StreamField
+    from wagtail.models import Page
+
+    problems = []
+    for page in Page.objects.live().filter(depth__gt=1).specific():
+        for field in page._meta.get_fields():
+            if not isinstance(field, StreamField):
+                continue
+            for block in getattr(page, field.name):
+                if block.block_type != "rich_text":
+                    continue
+                levels = [int(n) for n in re.findall(r"<h([1-6])\b", str(block.value.source))]
+                previous = 1  # the page title
+                for level in levels:
+                    if level > previous + 1:
+                        problems.append(f"{page.url_path}: h{previous} -> h{level}")
+                        break
+                    previous = level
+    assert not problems, "\n".join(problems)
+
+
+def _rewrites() -> dict[str, tuple[str, str]]:
+    """docs/content-neu/*.md -> {new path: (file name, body markdown)}."""
+    import re
+    from pathlib import Path
+
+    from django.conf import settings
+
+    folder = Path(settings.BASE_DIR).parent / "docs" / "content-neu"
+    result = {}
+    for f in sorted(folder.glob("*.md")):
+        if f.name == "README.md":
+            continue
+        head, _, body = f.read_text(encoding="utf-8").partition("\n---\n")
+        result[re.search(r"^- Pfad: `([^`]+)`", head, re.M).group(1)] = (f.name, body)
+    return result
+
+
+def test_rewrites_replace_legacy_bodies():
+    """Every file in docs/content-neu/ ends up as the body of its page."""
+    import re
+
+    from wagtail.models import Page
+
+    rewrites = _rewrites()
+    assert len(rewrites) == 24
+    by_url = {p.url: p.specific for p in Page.objects.live() if p.url}
+    for path, (name, body) in rewrites.items():
+        page = by_url[path]
+        html = "".join(str(b.value) for b in page.body if b.block_type == "rich_text")
+        first_heading = re.search(r"^## (.+)$", body, re.M).group(1)
+        assert f">{first_heading}</h2>" in html, name
+    unterhalt = by_url["/gebaeudereinigung/unterhaltsreinigung/"]
+    assert str(unterhalt.body[0].value).count("Verkehrsmittel") == 1  # legacy duplicate gone
+
+
+def test_rewrite_links_point_to_live_pages():
+    import re
+
+    from wagtail.models import Page
+
+    live = {p.url for p in Page.objects.live() if p.url}
+    for _path, (name, body) in _rewrites().items():
+        for target in re.findall(r"\]\((/[^)]*)\)", body):
+            assert target in live, f"{name}: {target}"
+
+
+def test_analytics_settings(client):
+    """Tracking is off until script URL and website ID are set; then the Umami config is served."""
+    from wagtail.models import Site
+
+    from site_settings.models import SiteSettings
+
+    assert client.get("/api/v2/settings/").json()["site"]["analytics"] is None
+    ss = SiteSettings.for_site(Site.objects.get(is_default_site=True))
+    ss.analytics_script_url = "https://statistik.grabnar.de/script.js"
+    ss.analytics_website_id = " 94db1cb1-74f4-4a40-ad6c-962362670409 "
+    ss.analytics_domains = "www.grabnar.de, grabnar.de,"
+    ss.save()
+    try:
+        analytics = client.get("/api/v2/settings/").json()["site"]["analytics"]
+        assert analytics == {
+            "provider": "umami",
+            "script_url": "https://statistik.grabnar.de/script.js",
+            "website_id": "94db1cb1-74f4-4a40-ad6c-962362670409",
+            "host_url": "",
+            "domains": "www.grabnar.de,grabnar.de",
+            "performance": True,
+            "do_not_track": True,
+        }
+    finally:
+        ss.analytics_script_url = ""
+        ss.save()
+
+
+def test_send_report_mail(monkeypatch):
+    import io
+
+    from django.core import mail
+    from django.core.management import CommandError
+
+    html = "<html><body><h1>Statistik Oktober</h1><p>Kontakte: 12</p></body></html>"
+    monkeypatch.setattr("sys.stdin", io.StringIO(html))
+    call_command(
+        "send_report_mail",
+        to="a@example.com, b@example.com",
+        subject="Bericht",
+        stdout=io.StringIO(),
+    )
+    sent = mail.outbox[-1]
+    assert sent.to == ["a@example.com", "b@example.com"] and sent.subject == "Bericht"
+    assert "Kontakte: 12" in sent.body and sent.alternatives[0][0] == html
+
+    monkeypatch.setattr("sys.stdin", io.StringIO(""))
+    with pytest.raises(CommandError):
+        call_command("send_report_mail", to="a@example.com", subject="x")
+
+
+def test_company_wording_rules():
+    """Rules confirmed by the company (docs/02-konzept.md): no private customers, never mention
+    the security licence; ISO 9001/14001 appear on the company page."""
+    import re
+
+    from wagtail.fields import StreamField
+    from wagtail.models import Page
+
+    forbidden = re.compile(r"privat|§\s*34a|34a\s*GewO|bewachungserlaubnis", re.I)
+    problems = []
+    for page in Page.objects.live().filter(depth__gt=1).specific():
+        if page.slug in ("datenschutz", "impressum", "agb"):
+            continue  # legal texts are reviewed separately
+        texts = [
+            page.title,
+            getattr(page, "teaser", ""),
+            getattr(page, "intro", ""),
+            page.search_description,
+        ]
+        for field in page._meta.get_fields():
+            if isinstance(field, StreamField):
+                texts.append(str(getattr(page, field.name).get_prep_value()))
+        for text in texts:
+            if text and (m := forbidden.search(str(text))):
+                problems.append(
+                    f"{page.url_path}: …{str(text)[max(0, m.start() - 30) : m.end() + 30]}…"
+                )
+    assert not problems, "\n".join(problems)
+    about = Page.objects.get(slug="unternehmen").specific
+    body = str(about.body.get_prep_value())
+    assert "ISO 9001" in body and "ISO 14001" in body
+
+
+def test_certificate_seal(client):
+    """No seal uploaded → nothing on the site; after upload → footer setting + block carry it."""
+    from django.core.files.uploadedfile import SimpleUploadedFile
+    from wagtail.images.models import Image
+    from wagtail.models import Site
+
+    from site_settings.models import SiteSettings
+
+    def unternehmen_block():
+        page = client.get(
+            "/api/v2/pages/", {"type": "home.StandardPage", "slug": "unternehmen", "fields": "body"}
+        ).json()["items"][0]
+        return next(b for b in page["body"] if b["type"] == "certificate")["value"]
+
+    assert client.get("/api/v2/settings/").json()["site"]["certificate"] is None
+    assert unternehmen_block()["seal"] is None
+
+    svg = b'<svg xmlns="http://www.w3.org/2000/svg" width="200" height="200"><circle cx="100" cy="100" r="90"/></svg>'
+    image = Image(title="Siegel ISO 9001/14001")
+    image.file.save("siegel.svg", SimpleUploadedFile("siegel.svg", svg), save=False)
+    image._set_image_file_metadata()
+    image.save()
+    ss = SiteSettings.for_site(Site.objects.get(is_default_site=True))
+    ss.certificate_seal = image
+    ss.save()
+    try:
+        cert = client.get("/api/v2/settings/").json()["site"]["certificate"]
+        assert cert["label"] == "Zertifiziert nach ISO 9001 und ISO 14001"
+        assert cert["seal"]["height"] == 64 and cert["seal"]["url2x"]
+        assert cert["seal"]["alt"] == cert["label"] and cert["document_url"] == ""
+        block = unternehmen_block()
+        assert block["seal"]["height"] == 160 and block["heading"].startswith("Zertifiziert")
+    finally:
+        ss.certificate_seal = None
+        ss.save()
+        image.delete()

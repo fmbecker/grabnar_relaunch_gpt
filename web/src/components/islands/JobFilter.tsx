@@ -1,0 +1,71 @@
+import { useMemo, useState } from "react";
+import type { JobSummary } from "@/lib/types";
+import { EVENT, track, umami } from "@/lib/analytics";
+
+interface Props {
+  jobs: JobSummary[];
+}
+
+export default function JobFilter({ jobs }: Props) {
+  const [location, setLocation] = useState("");
+  const [type, setType] = useState("");
+
+  const locations = useMemo(() => [...new Set(jobs.map((j) => j.location))].sort(), [jobs]);
+  const types = useMemo(() => {
+    const m = new Map<string, string>();
+    for (const j of jobs) m.set(j.employment_type, j.employment_type_label);
+    return [...m.entries()];
+  }, [jobs]);
+
+  const visible = jobs.filter((j) => (!location || j.location === location) && (!type || j.employment_type === type));
+
+  return (
+    <div>
+      <div className="mb-6 flex flex-wrap gap-3">
+        <select className="field w-auto" value={location} onChange={(e) => {
+            setLocation(e.target.value);
+            track(EVENT.jobFilter, { field: "location", value: e.target.value || "alle" });
+          }} aria-label="Arbeitsort">
+          <option value="">Alle Orte</option>
+          {locations.map((l) => (
+            <option key={l} value={l}>
+              {l}
+            </option>
+          ))}
+        </select>
+        <select className="field w-auto" value={type} onChange={(e) => {
+            setType(e.target.value);
+            track(EVENT.jobFilter, { field: "employment_type", value: e.target.value || "alle" });
+          }} aria-label="Beschäftigungsart">
+          <option value="">Alle Beschäftigungsarten</option>
+          {types.map(([k, label]) => (
+            <option key={k} value={k}>
+              {label}
+            </option>
+          ))}
+        </select>
+      </div>
+      {visible.length === 0 ? (
+        <p className="text-ink-700">Keine Stellen für diese Auswahl.</p>
+      ) : (
+        <ul className="border-t-4 border-brand-500">
+          {visible.map((j) => (
+            <li key={j.id}>
+              <a href={j.href} {...umami(EVENT.jobOpen, { job: j.title })} className="group flex items-center justify-between gap-6 border-b border-ink-100 bg-white px-1 py-6 hover:bg-brand-50 sm:px-4">
+                <div>
+                  <h3 className="h3 group-hover:text-brand-700">{j.title}</h3>
+                  <p className="mt-2 text-ink-700">
+                    {j.location} · {j.employment_type_label} · {j.start_date}
+                  </p>
+                </div>
+                <span aria-hidden="true" className="grid h-11 w-11 shrink-0 place-items-center bg-brand-500 text-xl text-white">
+                  →
+                </span>
+              </a>
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  );
+}

@@ -1,0 +1,54 @@
+"""Image serialisation for the API: fixed renditions the frontend relies on."""
+
+from __future__ import annotations
+
+from typing import Any
+
+# name -> Wagtail filter spec. Frontend builds <picture>/srcset from these.
+# WebP quality 70 (Wagtail default 80): ~25 % smaller, keeps the mobile hero LCP under 2.5 s.
+RENDITIONS = {
+    "thumb": "fill-400x300|format-webp|webpquality-70",
+    "card": "fill-800x600|format-webp|webpquality-70",
+    "wide": "fill-1600x900|format-webp|webpquality-70",
+    "hero": "fill-2000x1000|format-webp|webpquality-70",
+    "full": "width-1600|format-webp|webpquality-70",
+}
+
+
+def image_api_representation(image) -> dict[str, Any] | None:
+    if image is None:
+        return None
+    renditions = {}
+    for name, spec in RENDITIONS.items():
+        rendition = image.get_rendition(spec)
+        renditions[name] = {
+            "url": rendition.url,
+            "width": rendition.width,
+            "height": rendition.height,
+        }
+    return {
+        "id": image.pk,
+        "title": image.title,
+        "alt": getattr(image, "alt_text", "") or image.title,
+        "width": image.width,
+        "height": image.height,
+        "renditions": renditions,
+    }
+
+
+def logo_api_representation(image, height: int = 80) -> dict[str, Any] | None:
+    """Logo/seal: uncropped, fixed height, original format (keeps PNG transparency, SVG stays SVG).
+
+    Two renditions for <img srcset> (1x/2x). Never uses the cropping renditions above.
+    """
+    if image is None:
+        return None
+    r1 = image.get_rendition(f"height-{height}")
+    r2 = image.get_rendition(f"height-{height * 2}")
+    return {
+        "url": r1.url,
+        "url2x": r2.url,
+        "width": r1.width,
+        "height": r1.height,
+        "alt": getattr(image, "alt_text", "") or image.title,
+    }
