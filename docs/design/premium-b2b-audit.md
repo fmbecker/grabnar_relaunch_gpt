@@ -45,3 +45,16 @@ Dies ist ein **Code- und Design-Audit**, keine visuelle Browserabnahme. Aktuelle
 - WCAG 2.1 AA, axe 0 Verstöße; Lighthouse-Ziel mobil 100/100/100/100 (Messwert, nicht ungeprüft behaupten).
 - Keine externen CDNs/Fonts; Bilder aus Wagtail-Renditions; `prefers-reduced-motion` respektiert.
 - Redesign ausschließlich im Workspace-Feature-Branch; kein Deployment, kein Eingriff in `grabnar_relaunch`.
+
+## Visueller Regressionstest – 14.11.2026
+
+Die CI erzeugt über `web/scripts/screenshots.mjs` Screenshots bei 390 und 1440 px. Verglichen wurden die Artefakte der Web-Läufe für `ebb0aea` (Baseline vor der mobilen ServiceGrid-Verdichtung) und `0558fd6` (danach), jeweils aus derselben Seed-CMS-Testumgebung.
+
+| Seite / Breite | Vorher | Nachher | Differenz |
+| --- | ---: | ---: | ---: |
+| Startseite 390 px | 7633 px | 7226 px | −407 px (−5,3 %) |
+| Startseite 1440 px | 6336 px | 6288 px | −48 px (−0,8 %) |
+| Gebäudereinigung 390/1440 px | unverändert | unverändert | pixelidentisch |
+| Kontakt 390/1440 px | unverändert | unverändert | pixelidentisch |
+
+**Ergebnis:** Die mobile Verdichtung wirkt auf die gewünschte Seite und reduziert die Scrolllänge deutlich. Diese Messung ersetzt keine manuelle Qualitätsabnahme von Typografie, Fotografie und visueller Hierarchie. Beide CI-Läufe sind erfolgreich; die Screenshots sind als GitHub-Actions-Artefakt `responsive-screenshots` verfügbar.
