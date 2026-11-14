@@ -32,12 +32,12 @@ try {
         const response = await page.goto(base + pageSpec.path, { waitUntil: "networkidle" });
         if (!response?.ok()) throw new Error(`Page ${pageSpec.path} returned ${response?.status() ?? "no response"}`);
         await page.evaluate(async () => {
-          await document.fonts.ready;
-          for (let y = 0; y < document.body.scrollHeight; y += 600) {
-            window.scrollTo(0, y);
+          await globalThis.document.fonts.ready;
+          for (let y = 0; y < globalThis.document.body.scrollHeight; y += 600) {
+            globalThis.window.scrollTo(0, y);
             await new Promise((resolve) => setTimeout(resolve, 50));
           }
-          window.scrollTo(0, 0);
+          globalThis.window.scrollTo(0, 0);
         });
         await page.waitForLoadState("networkidle");
         const file = join(out, `${pageSpec.name}-${viewport.width}.png`);
