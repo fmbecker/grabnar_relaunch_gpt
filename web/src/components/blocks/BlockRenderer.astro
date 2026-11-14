@@ -1,0 +1,51 @@
+---
+/** Maps StreamField blocks to components. Keep in sync with cms/blocks/blocks.py. */
+import type { Block, ContactSettings, JobSummary } from "@/lib/types";
+import Facts from "./Facts.astro";
+import RichText from "./RichText.astro";
+import TextImage from "./TextImage.astro";
+import ServiceGrid from "./ServiceGrid.astro";
+import FeatureList from "./FeatureList.astro";
+import Stats from "./Stats.astro";
+import Testimonial from "./Testimonial.astro";
+import Faq from "./Faq.astro";
+import Cta from "./Cta.astro";
+import ContactForm from "./ContactForm.astro";
+import JobList from "./JobList.astro";
+import JobEmbed from "./JobEmbed.astro";
+import Map from "./Map.astro";
+import Gallery from "./Gallery.astro";
+import Certificate from "./Certificate.astro";
+
+interface Props {
+  blocks: Block[];
+  contact: ContactSettings;
+  sourcePath: string;
+  job?: Pick<JobSummary, "id" | "title">;
+  /** Title of the service page being rendered (CTA links carry it to the contact form). */
+  service?: string;
+  /** false = closing CTA without its phone number (the home page shows it in the header already). */
+  ctaPhone?: boolean;
+}
+const { blocks, contact, sourcePath, job, service, ctaPhone = true } = Astro.props;
+---
+{blocks.map((b) => {
+  switch (b.type) {
+    case "facts": return <Facts value={b.value} />;
+    case "rich_text": return <RichText value={b.value} />;
+    case "text_image": return <TextImage value={b.value} service={service} />;
+    case "service_grid": return <ServiceGrid value={b.value} />;
+    case "feature_list": return <FeatureList value={b.value} />;
+    case "stats": return <Stats value={b.value} />;
+    case "testimonial": return <Testimonial value={b.value} />;
+    case "faq": return <Faq value={b.value} />;
+    case "cta": return <Cta value={b.value} service={service} showPhone={ctaPhone} />;
+    case "contact_form": return <ContactForm value={b.value} sourcePath={sourcePath} job={job} contact={contact} />;
+    case "job_list": return <JobList value={b.value} />;
+    case "job_embed": return <JobEmbed value={b.value} />;
+    case "map": return <Map value={b.value} contact={contact} />;
+    case "gallery": return <Gallery value={b.value} />;
+    case "certificate": return <Certificate value={b.value} />;
+    default: return null;
+  }
+})}
